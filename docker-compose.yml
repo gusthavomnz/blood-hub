@@ -1,0 +1,40 @@
+services:
+  db:
+    image: mysql:8.4
+    container_name: bloodhub-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-bloodhub}
+      MYSQL_USER: ${MYSQL_USER:-bloodhub}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-bloodhub}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./db/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      MYSQL_HOST: db
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-bloodhub}
+      MYSQL_USER: ${MYSQL_USER:-bloodhub}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-bloodhub}
+    stdin_open: true
+    tty: true
+
+volumes:
+  mysql_data:
