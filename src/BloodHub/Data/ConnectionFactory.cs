@@ -11,12 +11,21 @@ public sealed class ConnectionFactory(DatabaseSettings settings)
         Database = settings.Database,
         UserID = settings.User,
         Password = settings.Password,
+        UseAffectedRows = false,
     }.ConnectionString;
 
     public async Task<MySqlConnection> OpenAsync()
     {
         var connection = new MySqlConnection(_connectionString);
-        await connection.OpenAsync();
-        return connection;
+        try
+        {
+            await connection.OpenAsync();
+            return connection;
+        }
+        catch
+        {
+            await connection.DisposeAsync();
+            throw;
+        }
     }
 }

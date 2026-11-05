@@ -1,4 +1,5 @@
 ﻿using BloodHub.Data;
+using BloodHub.Telas;
 using MySqlConnector;
 
 var connectionFactory = new ConnectionFactory(DatabaseSettings.FromEnvironment());
@@ -10,19 +11,11 @@ try
 }
 catch (MySqlException ex)
 {
-    Console.Error.WriteLine($"Falha ao conectar no banco: {ex.Message}");
+    Console.Error.WriteLine(TradutorErroBanco.Traduzir(ex, "conectar ao banco").Message);
     return 1;
 }
 
-Console.WriteLine("Bem-vindo ao Blood Hub! Digite 'sair' para encerrar.");
-
-while (true)
-{
-    Console.Write("> ");
-    var input = Console.ReadLine();
-
-    if (input is null || input.Trim().Equals("sair", StringComparison.OrdinalIgnoreCase))
-        break;
-}
+var repositorio = new DoadorRepositorio(connectionFactory);
+await new TelaDoador(repositorio).ExecutarAsync();
 
 return 0;
