@@ -1,4 +1,5 @@
-﻿using BloodHub.Data;
+using BloodHub.Data;
+using BloodHub.Telas;
 using MySqlConnector;
 
 var connectionFactory = new ConnectionFactory(DatabaseSettings.FromEnvironment());
@@ -14,15 +15,7 @@ catch (MySqlException ex)
     return 1;
 }
 
-Console.WriteLine("Bem-vindo ao Blood Hub! Digite 'sair' para encerrar.");
-
-while (true)
-{
-    Console.Write("> ");
-    var input = Console.ReadLine();
-
-    if (input is null || input.Trim().Equals("sair", StringComparison.OrdinalIgnoreCase))
-        break;
-}
+var menu = new MenuPrincipal(connectionFactory);
+await menu.ExecutarAsync();
 
 return 0;
