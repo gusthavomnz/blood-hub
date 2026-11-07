@@ -1,3 +1,4 @@
+using BloodHub.Controladores;
 using BloodHub.Data;
 using BloodHub.Repositorios;
 
@@ -10,12 +11,14 @@ namespace BloodHub.Telas;
 public class MenuPrincipal
 {
     private readonly TelaDoador _telaDoador;
-    private readonly DoadorRepositorio _doadorRepositorio;
+    private readonly IDoadorRepositorio _doadorRepositorio;
+    private readonly DoadorController _doadorController;
 
     public MenuPrincipal(ConnectionFactory connectionFactory)
     {
         _doadorRepositorio = new DoadorRepositorio(connectionFactory);
-        _telaDoador = new TelaDoador(_doadorRepositorio);
+        _telaDoador = new TelaDoador();
+        _doadorController = new DoadorController(_doadorRepositorio, _telaDoador);
     }
 
     /// <summary>
@@ -38,7 +41,7 @@ public class MenuPrincipal
                 switch (opcao)
                 {
                     case 1:
-                        await _telaDoador.ExibirMenuAsync();
+                        await _doadorController.ExecutarMenuAsync();
                         break;
                     case 2:
                         await ExibirMenuRelatoriosAsync();
