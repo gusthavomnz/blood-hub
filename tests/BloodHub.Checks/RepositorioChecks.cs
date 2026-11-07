@@ -1,6 +1,8 @@
 using System.ComponentModel.DataAnnotations;
 using BloodHub.Data;
-using BloodHub.Models;
+using BloodHub.Modelos;
+using BloodHub.Repositorios;
+using BloodHub.Validacao;
 using MySqlConnector;
 
 namespace BloodHub.Checks;
@@ -35,14 +37,15 @@ public static class RepositorioChecks
 
         try
         {
-            if ((await repositorio.ListarAsync()).Count != 0)
+            if ((await repositorio.ListarTodosAsync()).Count != 0)
                 throw new InvalidOperationException("O banco de testes precisa estar sem doadores. Nenhum registro existente foi alterado.");
 
             const string cpfA = "00123456797";
             var cpfB = GerarCpf("123456789");
             var doadorA = CriarDoador("  Doador Sintético %_! A  ", "001.234.567-97");
             doadorA.Sexo = " m ";
-            doadorA.TipoSanguineo = " o+ ";
+            doadorA.TipoSanguineo = " o ";
+            doadorA.FatorRh = " + ";
             doadorA.Telefone = "  ";
             doadorA.DataNascimento = new DateTime(1995, 5, 20, 14, 30, 0);
 
@@ -56,12 +59,12 @@ public static class RepositorioChecks
                 ?? throw new InvalidOperationException("O doador cadastrado não foi encontrado pelo ID.");
             Verificar(salvoA.Cpf == cpfA, "O CPF deveria preservar zeros iniciais e perder somente a máscara.");
             Verificar(salvoA.Nome == "Doador Sintético %_! A", "O nome deveria ser normalizado e preservar acentos.");
-            Verificar(salvoA.Sexo == "M" && salvoA.TipoSanguineo == "O+", "Sexo e tipo sanguíneo deveriam ser normalizados.");
+            Verificar(salvoA.Sexo == "M" && salvoA.TipoSanguineo == "O" && salvoA.FatorRh == "+", "Sexo e tipo sanguíneo deveriam ser normalizados.");
             Verificar(salvoA.Telefone is null, "Telefone vazio deveria ser persistido como NULL.");
             Verificar(salvoA.DataNascimento == new DateTime(1995, 5, 20), "Nascimento deveria ser persistido como data.");
             Verificar(salvoA.Ativo, "Um novo cadastro deveria estar ativo.");
             Verificar((await repositorio.BuscarPorCpfAsync("001.234.567-97"))?.Id == idA, "A busca por CPF deveria aceitar máscara.");
-            Verificar((await repositorio.ListarAsync()).Count == 2, "A listagem deveria incluir os dois registros.");
+            Verificar((await repositorio.ListarTodosAsync()).Count == 2, "A listagem deveria incluir os dois registros.");
             Verificar((await repositorio.BuscarPorNomeAsync("Sintético")).Count == 2, "A busca parcial deveria encontrar ambos os nomes.");
             Verificar((await repositorio.BuscarPorNomeAsync("%")).SingleOrDefault()?.Id == idA, "O caractere % deveria ser pesquisado literalmente.");
             Verificar((await repositorio.BuscarPorNomeAsync("_")).SingleOrDefault()?.Id == idA, "O caractere _ deveria ser pesquisado literalmente.");
@@ -82,19 +85,19 @@ public static class RepositorioChecks
                 "A atualização deveria persistir nome normalizado e manter o CPF.");
             Verificar(atualizadoA.Telefone == "85999999999", "O telefone deveria ser normalizado na atualização.");
 
-            var duplicadoInsercao = await EsperarErroAsync<ErroBancoException>(
+            var duplicadoInsercao = await EsperarErroAsync<MySqlException>(
                 () => repositorio.InserirAsync(CriarDoador("Duplicado não deve persistir", cpfA)));
-            Verificar(duplicadoInsercao.Message.Contains("CPF", StringComparison.OrdinalIgnoreCase),
+            Verificar(TradutorErroBanco.Traduzir(duplicadoInsercao)?.Contains("CPF", StringComparison.OrdinalIgnoreCase) == true,
                 "A duplicidade no cadastro deveria produzir uma mensagem sobre CPF.");
-            Verificar((await repositorio.ListarAsync()).Count == 2, "A tentativa de CPF duplicado não deveria criar um registro.");
+            Verificar((await repositorio.ListarTodosAsync()).Count == 2, "A tentativa de CPF duplicado não deveria criar um registro.");
 
             var salvoB = await repositorio.BuscarPorIdAsync(idB)
                 ?? throw new InvalidOperationException("O segundo doador não foi encontrado.");
             salvoB.Cpf = cpfA;
             salvoB.Nome = "Alteração duplicada não deve persistir";
-            var duplicadoAtualizacao = await EsperarErroAsync<ErroBancoException>(
+            var duplicadoAtualizacao = await EsperarErroAsync<MySqlException>(
                 () => repositorio.AtualizarAsync(salvoB));
-            Verificar(duplicadoAtualizacao.Message.Contains("CPF", StringComparison.OrdinalIgnoreCase),
+            Verificar(TradutorErroBanco.Traduzir(duplicadoAtualizacao)?.Contains("CPF", StringComparison.OrdinalIgnoreCase) == true,
                 "A duplicidade na atualização deveria produzir uma mensagem sobre CPF.");
             var intactoB = await repositorio.BuscarPorIdAsync(idB);
             Verificar(intactoB?.Cpf == cpfB && intactoB.Nome == "Doador Sintético B",
@@ -102,25 +105,25 @@ public static class RepositorioChecks
 
             await EsperarErroAsync<ValidationException>(
                 () => repositorio.InserirAsync(CriarDoador("CPF inválido não deve persistir", "11111111111")));
-            Verificar((await repositorio.ListarAsync()).Count == 2, "Entrada inválida deveria ser rejeitada sem gravar dados.");
+            Verificar((await repositorio.ListarTodosAsync()).Count == 2, "Entrada inválida deveria ser rejeitada sem gravar dados.");
 
             Verificar(await repositorio.InativarAsync(idA), "A inativação deveria encontrar o doador.");
             Verificar(await repositorio.InativarAsync(idA), "Inativar novamente deveria continuar sendo uma operação válida.");
             var inativoA = await repositorio.BuscarPorIdAsync(idA);
             Verificar(inativoA is { Ativo: false } && inativoA.Cpf == cpfA,
                 "Inativar deveria preservar o cadastro e alterar somente sua situação.");
-            Verificar((await repositorio.ListarAsync()).Any(d => d.Id == idA && !d.Ativo),
+            Verificar((await repositorio.ListarTodosAsync()).Any(d => d.Id == idA && !d.Ativo),
                 "A listagem deveria continuar mostrando o doador inativo.");
 
-            await InserirDoacaoRecusadaAsync(conexoes, idA);
-            var exclusaoBloqueada = await EsperarErroAsync<ErroBancoException>(() => repositorio.ExcluirAsync(idA));
-            Verificar(exclusaoBloqueada.Message.Contains("doações", StringComparison.OrdinalIgnoreCase) &&
-                      exclusaoBloqueada.Message.Contains("Inative", StringComparison.OrdinalIgnoreCase),
-                "A exclusão bloqueada deveria explicar o vínculo e oferecer inativação.");
+            await InserirDoacaoVinculadaAsync(conexoes, idA);
+            var exclusaoBloqueada = await EsperarErroAsync<MySqlException>(() => repositorio.ExcluirAsync(idA));
+            var mensagemExclusao = TradutorErroBanco.Traduzir(exclusaoBloqueada);
+            Verificar(mensagemExclusao?.Contains("doações", StringComparison.OrdinalIgnoreCase) == true,
+                "A exclusão bloqueada deveria explicar o vínculo com as doações.");
             Verificar(await repositorio.BuscarPorIdAsync(idA) is not null,
                 "O doador deveria permanecer após a tentativa de exclusão bloqueada.");
             Verificar(await ContarDoacoesAsync(conexoes, idA) == 1,
-                "Até uma doação recusada deveria bloquear a exclusão e permanecer no histórico.");
+                "A doação vinculada deveria bloquear a exclusão e permanecer no histórico.");
 
             Verificar(await repositorio.ExcluirAsync(idB), "Um doador sem doações deveria poder ser excluído.");
             Verificar(await repositorio.BuscarPorIdAsync(idB) is null, "O doador excluído não deveria ser encontrado.");
@@ -161,7 +164,9 @@ public static class RepositorioChecks
         Cpf = cpf,
         DataNascimento = new DateTime(1995, 5, 20),
         Sexo = "F",
-        TipoSanguineo = "AB-",
+        TipoSanguineo = "AB",
+        FatorRh = "-",
+        Peso = 65m,
         Ativo = true
     };
 
@@ -192,28 +197,25 @@ public static class RepositorioChecks
         throw new InvalidOperationException($"Era esperado um erro {typeof(T).Name}.");
     }
 
-    private static async Task InserirDoacaoRecusadaAsync(ConnectionFactory conexoes, int doadorId)
+    private static async Task InserirDoacaoVinculadaAsync(ConnectionFactory conexoes, int doadorId)
     {
         const string sql = """
-            INSERT INTO doacao (doador_id, data_doacao, peso_kg, volume_ml, status, motivo_recusa, local_coleta)
-            VALUES (@doador, @data, @peso, @volume, @status, @motivo, @local);
+            INSERT INTO doacoes (doador_id, data_doacao, volume_ml, observacao)
+            VALUES (@doador, @data, @volume, @observacao);
             """;
         await using var conexao = await conexoes.OpenAsync();
         await using var comando = new MySqlCommand(sql, conexao);
         comando.Parameters.AddWithValue("@doador", doadorId);
-        comando.Parameters.AddWithValue("@data", new DateTime(2026, 1, 15, 9, 0, 0));
-        comando.Parameters.AddWithValue("@peso", 60m);
-        comando.Parameters.AddWithValue("@volume", 0);
-        comando.Parameters.AddWithValue("@status", "Recusada");
-        comando.Parameters.AddWithValue("@motivo", "Registro sintético para verificar integridade referencial.");
-        comando.Parameters.AddWithValue("@local", "Unidade de testes");
+        comando.Parameters.AddWithValue("@data", new DateTime(2026, 1, 15));
+        comando.Parameters.AddWithValue("@volume", 450);
+        comando.Parameters.AddWithValue("@observacao", "Registro sintético para verificar integridade referencial.");
         await comando.ExecuteNonQueryAsync();
     }
 
     private static async Task<long> ContarDoacoesAsync(ConnectionFactory conexoes, int doadorId)
     {
         await using var conexao = await conexoes.OpenAsync();
-        await using var comando = new MySqlCommand("SELECT COUNT(*) FROM doacao WHERE doador_id = @id;", conexao);
+        await using var comando = new MySqlCommand("SELECT COUNT(*) FROM doacoes WHERE doador_id = @id;", conexao);
         comando.Parameters.AddWithValue("@id", doadorId);
         return Convert.ToInt64(await comando.ExecuteScalarAsync());
     }
@@ -223,11 +225,11 @@ public static class RepositorioChecks
         await using var conexao = await conexoes.OpenAsync();
         foreach (var id in ids)
         {
-            await using var doacoes = new MySqlCommand("DELETE FROM doacao WHERE doador_id = @id;", conexao);
+            await using var doacoes = new MySqlCommand("DELETE FROM doacoes WHERE doador_id = @id;", conexao);
             doacoes.Parameters.AddWithValue("@id", id);
             await doacoes.ExecuteNonQueryAsync();
 
-            await using var doador = new MySqlCommand("DELETE FROM doador WHERE id = @id;", conexao);
+            await using var doador = new MySqlCommand("DELETE FROM doadores WHERE id = @id;", conexao);
             doador.Parameters.AddWithValue("@id", id);
             await doador.ExecuteNonQueryAsync();
         }

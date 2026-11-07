@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
-using BloodHub.Models;
-using BloodHub.Regras;
+using BloodHub.Modelos;
+using BloodHub.Validacao;
 
 namespace BloodHub.Checks;
 
@@ -31,7 +31,7 @@ public static class ValidadoresChecks
 
         Verificar("CPF válido preserva os zeros iniciais", () =>
         {
-            Exigir(Validadores.CpfValido(CpfExemplo), "O CPF sintético deveria ser válido.");
+            Exigir(Validadores.ValidarCpf(CpfExemplo), "O CPF sintético deveria ser válido.");
             Exigir(Validadores.NormalizarCpf(CpfExemplo) == CpfExemplo, "Os zeros iniciais foram alterados.");
         });
 
@@ -59,7 +59,7 @@ public static class ValidadoresChecks
         {
             Verificar($"CPF rejeita {caso.Descricao}", () =>
             {
-                Exigir(!Validadores.CpfValido(caso.Cpf), "A consulta de validade deveria retornar false.");
+                Exigir(!Validadores.ValidarCpf(caso.Cpf), "A consulta de validade deveria retornar false.");
                 DeveLancar<ValidationException>(() => Validadores.NormalizarCpf(caso.Cpf));
             });
         }
@@ -70,7 +70,8 @@ public static class ValidadoresChecks
             original.Nome = "  Maria de Teste  ";
             original.Cpf = "001.234.567-97";
             original.Sexo = " f ";
-            original.TipoSanguineo = " ab- ";
+            original.TipoSanguineo = " ab ";
+            original.FatorRh = " - ";
             original.Telefone = "  (85) 99999-0000  ";
             original.DataNascimento = new DateTime(1995, 5, 20, 15, 30, 0);
 
@@ -79,7 +80,7 @@ public static class ValidadoresChecks
             Exigir(normalizado.Nome == "Maria de Teste", "Nome não normalizado.");
             Exigir(normalizado.Cpf == CpfExemplo, "CPF não normalizado.");
             Exigir(normalizado.Sexo == "F", "Sexo não normalizado.");
-            Exigir(normalizado.TipoSanguineo == "AB-", "Tipo sanguíneo não normalizado.");
+            Exigir(normalizado.TipoSanguineo == "AB" && normalizado.FatorRh == "-", "Tipo sanguíneo não normalizado.");
             Exigir(normalizado.Telefone == "(85) 99999-0000", "Telefone não normalizado.");
             Exigir(normalizado.DataNascimento == new DateTime(1995, 5, 20), "Nascimento deveria guardar apenas a data.");
         });
@@ -142,18 +143,24 @@ public static class ValidadoresChecks
 
         Verificar("todos os oito tipos sanguíneos são aceitos", () =>
         {
-            foreach (var tipo in new[] { "A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-" })
+            foreach (var (tipo, fator) in new[]
+            {
+                ("A", "+"), ("A", "-"), ("B", "+"), ("B", "-"),
+                ("AB", "+"), ("AB", "-"), ("O", "+"), ("O", "-")
+            })
             {
                 var doador = DoadorValido();
                 doador.TipoSanguineo = tipo;
-                Exigir(Validadores.NormalizarEValidar(doador).TipoSanguineo == tipo, $"Tipo {tipo} rejeitado.");
+                doador.FatorRh = fator;
+                var normalizado = Validadores.NormalizarEValidar(doador);
+                Exigir(normalizado.TipoSanguineo == tipo && normalizado.FatorRh == fator, $"Tipo {tipo}{fator} rejeitado.");
             }
         });
 
         Verificar("tipo sanguíneo desconhecido é rejeitado", () =>
         {
             var doador = DoadorValido();
-            doador.TipoSanguineo = "C+";
+            doador.TipoSanguineo = "C";
             DeveLancar<ValidationException>(() => Validadores.NormalizarEValidar(doador));
         });
 
@@ -223,7 +230,9 @@ public static class ValidadoresChecks
         Cpf = CpfExemplo,
         DataNascimento = new DateTime(1995, 5, 20),
         Sexo = "F",
-        TipoSanguineo = "O+",
+        TipoSanguineo = "O",
+        FatorRh = "+",
+        Peso = 65m,
     };
 
     private static void Exigir(bool condicao, string mensagem)

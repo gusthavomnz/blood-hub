@@ -1,192 +1,369 @@
 using System.ComponentModel.DataAnnotations;
-using System.Globalization;
-using BloodHub.Data;
-using BloodHub.Models;
+using BloodHub.Modelos;
+using BloodHub.Repositorios;
+using BloodHub.Validacao;
+using MySqlConnector;
 
 namespace BloodHub.Telas;
 
-public sealed class TelaDoador(DoadorRepositorio repositorio)
+/// <summary>
+/// Interface de terminal para o CRUD de Doador.
+/// Consome DoadorRepositorio, Validadores e TradutorErroBanco.
+/// </summary>
+public class TelaDoador
 {
-    public async Task ExecutarAsync()
+    private readonly DoadorRepositorio _repositorio;
+
+    public TelaDoador(DoadorRepositorio repositorio)
+    {
+        _repositorio = repositorio;
+    }
+
+    /// <summary>
+    /// Exibe o submenu de doadores e processa a opção escolhida.
+    /// </summary>
+    public async Task ExibirMenuAsync()
     {
         while (true)
         {
+            var opcao = LeitorConsole.LerOpcaoMenu("Gerenciar Doadores", [
+                "Cadastrar doador",
+                "Listar doadores",
+                "Buscar doador",
+                "Atualizar doador",
+                "Excluir doador",
+                "Voltar ao menu principal"
+            ]);
+
             try
             {
-                Console.WriteLine();
-                Console.WriteLine("Blood Hub — Doadores");
-                Console.WriteLine("1. Cadastrar        2. Listar");
-                Console.WriteLine("3. Buscar por ID    4. Buscar por CPF");
-                Console.WriteLine("5. Buscar por nome  6. Atualizar");
-                Console.WriteLine("7. Inativar         8. Excluir");
-                Console.WriteLine("0. Sair (ou digite sair)");
-
-                switch (LerLinha("Escolha uma opção: ").ToLowerInvariant())
+                switch (opcao)
                 {
-                    case "0":
-                    case "sair":
-                        return;
-                    case "1":
-                        var id = await repositorio.InserirAsync(LerCadastro());
-                        Console.WriteLine($"Doador cadastrado com o ID {id}.");
-                        break;
-                    case "2":
-                        MostrarLista(await repositorio.ListarAsync());
-                        break;
-                    case "3":
-                        MostrarDoador(await repositorio.BuscarPorIdAsync(LerId()));
-                        break;
-                    case "4":
-                        MostrarDoador(await repositorio.BuscarPorCpfAsync(LerLinha("CPF: ")));
-                        break;
-                    case "5":
-                        MostrarLista(await repositorio.BuscarPorNomeAsync(LerLinha("Parte do nome: ")));
-                        break;
-                    case "6":
-                        await AtualizarAsync();
-                        break;
-                    case "7":
-                        Console.WriteLine(await repositorio.InativarAsync(LerId())
-                            ? "Cadastro inativo. O histórico foi preservado."
-                            : "Doador não encontrado.");
-                        break;
-                    case "8":
-                        await ExcluirAsync();
-                        break;
-                    default:
-                        Console.WriteLine("Opção inválida. Escolha um número de 0 a 8.");
-                        break;
+                    case 1: await CadastrarAsync(); break;
+                    case 2: await ListarAsync(); break;
+                    case 3: await BuscarAsync(); break;
+                    case 4: await AtualizarAsync(); break;
+                    case 5: await ExcluirAsync(); break;
+                    case 6: return;
                 }
             }
-            catch (OperationCanceledException)
+            catch (MySqlException ex)
             {
-                return;
+                var msg = TradutorErroBanco.Traduzir(ex);
+                LeitorConsole.ExibirErro(msg ?? $"Erro de banco de dados: {ex.Message}");
             }
             catch (ValidationException ex)
             {
-                Console.WriteLine($"Dados inválidos: {ex.Message}");
+                LeitorConsole.ExibirErro(ex.Message);
             }
-            catch (ErroBancoException ex)
+            catch (Exception ex)
             {
-                Console.WriteLine(ex.Message);
+                LeitorConsole.ExibirErro($"Erro inesperado: {ex.Message}");
             }
+
+            LeitorConsole.AguardarEnter();
         }
     }
+
+    // ──────────────────────── CADASTRAR ────────────────────────
+
+    private async Task CadastrarAsync()
+    {
+        Console.WriteLine();
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine("══════ Cadastrar Novo Doador ══════");
+        Console.ResetColor();
+
+        var doador = LerDadosDoador();
+
+        // Validar dados antes de salvar
+        var erros = Validadores.ValidarDoador(doador);
+        if (erros.Count > 0)
+        {
+            Console.WriteLine();
+            LeitorConsole.ExibirErro("Erros de validação encontrados:");
+            foreach (var erro in erros)
+                LeitorConsole.ExibirErro($"  • {erro}");
+            return;
+        }
+
+        // Formatar CPF para armazenamento
+        doador.Cpf = Validadores.FormatarCpf(doador.Cpf);
+
+        try
+        {
+            await _repositorio.InserirAsync(doador);
+            LeitorConsole.ExibirSucesso($"Doador cadastrado com sucesso! ID: {doador.Id}");
+        }
+        catch (MySqlException ex)
+        {
+            var msg = TradutorErroBanco.Traduzir(ex);
+            LeitorConsole.ExibirErro(msg ?? $"Erro ao cadastrar: {ex.Message}");
+        }
+    }
+
+    // ──────────────────────── LISTAR ────────────────────────
+
+    private async Task ListarAsync()
+    {
+        var doadores = await _repositorio.ListarTodosAsync();
+        TelaRelatorios.ExibirTabelaDoadores(doadores);
+    }
+
+    // ──────────────────────── BUSCAR ────────────────────────
+
+    private async Task BuscarAsync()
+    {
+        var opcao = LeitorConsole.LerOpcaoMenu("Buscar Doador por", [
+            "ID",
+            "CPF",
+            "Nome",
+            "Voltar"
+        ]);
+
+        switch (opcao)
+        {
+            case 1:
+                await BuscarPorIdAsync();
+                break;
+            case 2:
+                await BuscarPorCpfAsync();
+                break;
+            case 3:
+                await BuscarPorNomeAsync();
+                break;
+            case 4:
+                return;
+        }
+    }
+
+    private async Task BuscarPorIdAsync()
+    {
+        var id = LeitorConsole.LerInt("ID do doador: ");
+        var doador = await _repositorio.BuscarPorIdAsync(id);
+
+        if (doador == null)
+        {
+            LeitorConsole.ExibirErro($"Doador com ID {id} não encontrado.");
+            return;
+        }
+
+        TelaRelatorios.ExibirDetalhesDoador(doador);
+    }
+
+    private async Task BuscarPorCpfAsync()
+    {
+        var cpf = LeitorConsole.LerTexto("CPF do doador: ");
+        cpf = Validadores.FormatarCpf(cpf);
+
+        var doador = await _repositorio.BuscarPorCpfAsync(cpf);
+
+        if (doador == null)
+        {
+            LeitorConsole.ExibirErro($"Doador com CPF {cpf} não encontrado.");
+            return;
+        }
+
+        TelaRelatorios.ExibirDetalhesDoador(doador);
+    }
+
+    private async Task BuscarPorNomeAsync()
+    {
+        var nome = LeitorConsole.LerTexto("Nome (ou parte do nome): ");
+        var doadores = await _repositorio.BuscarPorNomeAsync(nome);
+
+        if (doadores.Count == 0)
+        {
+            LeitorConsole.ExibirErro($"Nenhum doador encontrado com o nome '{nome}'.");
+            return;
+        }
+
+        TelaRelatorios.ExibirTabelaDoadores(doadores);
+    }
+
+    // ──────────────────────── ATUALIZAR ────────────────────────
 
     private async Task AtualizarAsync()
     {
-        var doador = await repositorio.BuscarPorIdAsync(LerId());
-        if (doador is null)
+        var id = LeitorConsole.LerInt("ID do doador a atualizar: ");
+        var doador = await _repositorio.BuscarPorIdAsync(id);
+
+        if (doador == null)
         {
-            Console.WriteLine("Doador não encontrado.");
+            LeitorConsole.ExibirErro($"Doador com ID {id} não encontrado.");
             return;
         }
 
-        Console.WriteLine("Pressione Enter para manter cada valor atual. No telefone, digite - para limpar.");
-        LerCadastro(doador);
-        Console.WriteLine(await repositorio.AtualizarAsync(doador)
-            ? "Cadastro atualizado."
-            : "Doador não encontrado.");
+        TelaRelatorios.ExibirDetalhesDoador(doador);
+        Console.WriteLine();
+        LeitorConsole.ExibirInfo("Preencha os novos dados (deixe em branco para manter o valor atual).");
+        Console.WriteLine();
+
+        // Ler novos dados, mantendo os atuais se vazio
+        var nome = LeitorConsole.LerTextoOpcional($"Nome [{doador.Nome}]: ");
+        if (nome != null) doador.Nome = nome;
+
+        var cpf = LeitorConsole.LerTextoOpcional($"CPF [{doador.Cpf}]: ");
+        if (cpf != null) doador.Cpf = Validadores.FormatarCpf(cpf);
+
+        var dataNascStr = LeitorConsole.LerTextoOpcional($"Data de nascimento [{doador.DataNascimento:dd/MM/yyyy}]: ");
+        if (dataNascStr != null)
+        {
+            if (DateTime.TryParseExact(dataNascStr, "dd/MM/yyyy",
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var dataNasc))
+            {
+                doador.DataNascimento = dataNasc;
+            }
+            else
+            {
+                LeitorConsole.ExibirErro("Data inválida, mantendo o valor atual.");
+            }
+        }
+
+        var tipo = LeitorConsole.LerTextoOpcional($"Tipo sanguíneo [{doador.TipoSanguineo}]: ");
+        if (tipo != null) doador.TipoSanguineo = tipo.ToUpper();
+
+        var fator = LeitorConsole.LerTextoOpcional($"Fator Rh [{doador.FatorRh}]: ");
+        if (fator != null) doador.FatorRh = fator;
+
+        var sexo = LeitorConsole.LerTextoOpcional($"Sexo [{doador.Sexo}]: ");
+        if (sexo != null) doador.Sexo = sexo.ToUpper();
+
+        var pesoStr = LeitorConsole.LerTextoOpcional($"Peso [{doador.Peso:F1}]: ");
+        if (pesoStr != null)
+        {
+            if (decimal.TryParse(pesoStr, System.Globalization.NumberStyles.Any,
+                System.Globalization.CultureInfo.GetCultureInfo("pt-BR"), out var peso))
+            {
+                doador.Peso = peso;
+            }
+            else if (decimal.TryParse(pesoStr, System.Globalization.NumberStyles.Any,
+                System.Globalization.CultureInfo.InvariantCulture, out peso))
+            {
+                doador.Peso = peso;
+            }
+            else
+            {
+                LeitorConsole.ExibirErro("Peso inválido, mantendo o valor atual.");
+            }
+        }
+
+        var telefone = LeitorConsole.LerTextoOpcional($"Telefone [{doador.Telefone}]: ");
+        if (telefone != null) doador.Telefone = telefone;
+
+        var email = LeitorConsole.LerTextoOpcional($"E-mail [{doador.Email ?? ""}]: ");
+        if (email != null) doador.Email = email;
+
+        var endereco = LeitorConsole.LerTextoOpcional($"Endereço [{doador.Endereco ?? ""}]: ");
+        if (endereco != null) doador.Endereco = endereco;
+
+        // Validar dados atualizados
+        var erros = Validadores.ValidarDoador(doador);
+        if (erros.Count > 0)
+        {
+            Console.WriteLine();
+            LeitorConsole.ExibirErro("Erros de validação encontrados:");
+            foreach (var erro in erros)
+                LeitorConsole.ExibirErro($"  • {erro}");
+            return;
+        }
+
+        if (!LeitorConsole.LerConfirmacao("Confirma a atualização?"))
+        {
+            LeitorConsole.ExibirInfo("Atualização cancelada.");
+            return;
+        }
+
+        try
+        {
+            await _repositorio.AtualizarAsync(doador);
+            LeitorConsole.ExibirSucesso("Doador atualizado com sucesso!");
+        }
+        catch (MySqlException ex)
+        {
+            var msg = TradutorErroBanco.Traduzir(ex);
+            LeitorConsole.ExibirErro(msg ?? $"Erro ao atualizar: {ex.Message}");
+        }
     }
+
+    // ──────────────────────── EXCLUIR / INATIVAR ────────────────────────
 
     private async Task ExcluirAsync()
     {
-        var doador = await repositorio.BuscarPorIdAsync(LerId());
-        if (doador is null)
+        var id = LeitorConsole.LerInt("ID do doador a excluir: ");
+        var doador = await _repositorio.BuscarPorIdAsync(id);
+
+        if (doador == null)
         {
-            Console.WriteLine("Doador não encontrado.");
+            LeitorConsole.ExibirErro($"Doador com ID {id} não encontrado.");
             return;
         }
 
-        var confirmacao = LerLinha($"Excluir o cadastro de {doador.Nome}? [s/N]: ");
-        if (!confirmacao.Equals("s", StringComparison.OrdinalIgnoreCase))
+        TelaRelatorios.ExibirDetalhesDoador(doador);
+        Console.WriteLine();
+
+        if (!LeitorConsole.LerConfirmacao("Tem certeza que deseja EXCLUIR este doador?"))
         {
-            Console.WriteLine("Exclusão cancelada.");
+            LeitorConsole.ExibirInfo("Operação cancelada.");
             return;
         }
 
-        Console.WriteLine(await repositorio.ExcluirAsync(doador.Id)
-            ? "Doador excluído."
-            : "Doador não encontrado.");
+        try
+        {
+            await _repositorio.ExcluirAsync(id);
+            LeitorConsole.ExibirSucesso("Doador excluído com sucesso!");
+        }
+        catch (MySqlException ex) when (TradutorErroBanco.EhRestricaoIntegridade(ex))
+        {
+            var msg = TradutorErroBanco.Traduzir(ex);
+            LeitorConsole.ExibirErro(msg ?? "Não é possível excluir este doador.");
+            Console.WriteLine();
+
+            if (LeitorConsole.LerConfirmacao("Deseja INATIVAR o doador em vez de excluí-lo?"))
+            {
+                try
+                {
+                    await _repositorio.InativarAsync(id);
+                    LeitorConsole.ExibirSucesso("Doador inativado com sucesso!");
+                }
+                catch (MySqlException exInativar)
+                {
+                    var msgInativar = TradutorErroBanco.Traduzir(exInativar);
+                    LeitorConsole.ExibirErro(msgInativar ?? $"Erro ao inativar: {exInativar.Message}");
+                }
+            }
+            else
+            {
+                LeitorConsole.ExibirInfo("Operação cancelada.");
+            }
+        }
     }
 
-    private static Doador LerCadastro(Doador? existente = null)
+    // ──────────────────────── LEITURA DE DADOS ────────────────────────
+
+    /// <summary>
+    /// Lê todos os dados de um doador a partir do console.
+    /// </summary>
+    private static Doador LerDadosDoador()
     {
-        var doador = existente ?? new Doador();
-        doador.Nome = LerTexto("Nome", existente?.Nome);
-        doador.Cpf = LerTexto("CPF", existente?.Cpf);
-        doador.DataNascimento = LerData(existente?.DataNascimento);
-        doador.Sexo = LerTexto("Sexo (M/F)", existente?.Sexo);
-        doador.TipoSanguineo = LerTexto("Tipo sanguíneo (A+, A-, B+, B-, AB+, AB-, O+, O-)", existente?.TipoSanguineo);
-        var telefone = LerTexto("Telefone (opcional)", existente?.Telefone);
-        doador.Telefone = telefone is "" or "-" ? null : telefone;
+        var doador = new Doador();
+
+        doador.Nome = LeitorConsole.LerTexto("Nome completo: ");
+        doador.Cpf = LeitorConsole.LerTexto("CPF (somente números ou com pontuação): ");
+        doador.DataNascimento = LeitorConsole.LerData("Data de nascimento (dd/MM/yyyy): ");
+
+        doador.TipoSanguineo = LeitorConsole.LerTexto("Tipo sanguíneo (A, B, AB, O): ").ToUpper();
+        doador.FatorRh = LeitorConsole.LerTexto("Fator Rh (+ ou -): ");
+        doador.Sexo = LeitorConsole.LerTexto("Sexo (M ou F): ").ToUpper();
+
+        doador.Peso = LeitorConsole.LerDecimal("Peso em kg (ex: 65,5): ");
+        doador.Telefone = LeitorConsole.LerTextoOpcional("Telefone (opcional): ");
+        doador.Email = LeitorConsole.LerTextoOpcional("E-mail (opcional): ");
+        doador.Endereco = LeitorConsole.LerTextoOpcional("Endereço (opcional): ");
+
+        doador.Ativo = true;
+
         return doador;
-    }
-
-    private static string LerTexto(string rotulo, string? atual = null)
-    {
-        var entrada = LerLinha(atual is null ? $"{rotulo}: " : $"{rotulo} [{atual}]: ");
-        return entrada.Length == 0 && atual is not null ? atual : entrada;
-    }
-
-    private static DateTime LerData(DateTime? atual)
-    {
-        while (true)
-        {
-            var entrada = LerLinha(atual is null
-                ? "Nascimento (dd/MM/aaaa): "
-                : $"Nascimento (dd/MM/aaaa) [{atual.Value:dd/MM/yyyy}]: ");
-            if (entrada.Length == 0 && atual.HasValue)
-                return atual.Value;
-            if (DateTime.TryParseExact(entrada, "dd/MM/yyyy", CultureInfo.InvariantCulture,
-                    DateTimeStyles.None, out var nascimento))
-                return nascimento;
-            Console.WriteLine("Informe uma data válida no formato dd/MM/aaaa.");
-        }
-    }
-
-    private static int LerId()
-    {
-        while (true)
-        {
-            if (int.TryParse(LerLinha("ID do doador: "), out var id) && id > 0)
-                return id;
-            Console.WriteLine("Informe um número inteiro maior que zero.");
-        }
-    }
-
-    private static string LerLinha(string mensagem)
-    {
-        Console.Write(mensagem);
-        return Console.ReadLine()?.Trim() ?? throw new OperationCanceledException();
-    }
-
-    private static void MostrarLista(List<Doador> doadores)
-    {
-        if (doadores.Count == 0)
-        {
-            Console.WriteLine("Nenhum doador encontrado.");
-            return;
-        }
-
-        Console.WriteLine($"{"ID",-6} {"Nome",-30} {"CPF",-11} {"Tipo",-4} Ativo");
-        foreach (var doador in doadores)
-        {
-            var nome = doador.Nome.Length > 30 ? doador.Nome[..27] + "..." : doador.Nome;
-            Console.WriteLine($"{doador.Id,-6} {nome,-30} {doador.Cpf,-11} {doador.TipoSanguineo,-4} {(doador.Ativo ? "Sim" : "Não")}");
-        }
-    }
-
-    private static void MostrarDoador(Doador? doador)
-    {
-        if (doador is null)
-        {
-            Console.WriteLine("Doador não encontrado.");
-            return;
-        }
-
-        Console.WriteLine($"ID: {doador.Id} | Nome: {doador.Nome} | CPF: {doador.Cpf}");
-        Console.WriteLine($"Nascimento: {doador.DataNascimento:dd/MM/yyyy} | Sexo: {doador.Sexo} | Tipo: {doador.TipoSanguineo}");
-        Console.WriteLine($"Telefone: {doador.Telefone ?? "Não informado"} | Ativo: {(doador.Ativo ? "Sim" : "Não")}");
     }
 }

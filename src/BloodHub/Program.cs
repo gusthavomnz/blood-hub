@@ -1,5 +1,6 @@
-﻿using BloodHub.Data;
+using BloodHub.Data;
 using BloodHub.Telas;
+using BloodHub.Validacao;
 using MySqlConnector;
 
 var connectionFactory = new ConnectionFactory(DatabaseSettings.FromEnvironment());
@@ -11,11 +12,12 @@ try
 }
 catch (MySqlException ex)
 {
-    Console.Error.WriteLine(TradutorErroBanco.Traduzir(ex, "conectar ao banco").Message);
+    var mensagem = TradutorErroBanco.Traduzir(ex);
+    Console.Error.WriteLine(mensagem ?? $"Falha ao conectar no banco: {ex.Message}");
     return 1;
 }
 
-var repositorio = new DoadorRepositorio(connectionFactory);
-await new TelaDoador(repositorio).ExecutarAsync();
+var menu = new MenuPrincipal(connectionFactory);
+await menu.ExecutarAsync();
 
 return 0;
