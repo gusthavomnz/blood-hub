@@ -3,7 +3,7 @@ using BloodHub.Modelos;
 namespace BloodHub.Repositorios;
 
 /// <summary>
-/// Contrato de persistência de doações. Implementado pelo DoacaoRepositorio (Tarefa 4).
+/// Contrato de persistência e consulta da entidade Doação via ADO.NET puro.
 /// </summary>
 public interface IDoacaoRepositorio
 {
