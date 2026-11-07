@@ -1,17 +1,19 @@
 using BloodHub.Controladores;
 using BloodHub.Data;
 using BloodHub.Repositorios;
+using BloodHub.Servicos;
 
 namespace BloodHub.Telas;
 
 /// <summary>
 /// Menu principal da aplicação Blood Hub.
-/// Integra todas as telas e opções disponíveis.
+/// Integra todas as telas, controladores e opções disponíveis.
 /// </summary>
 public class MenuPrincipal
 {
     private readonly TelaDoador _telaDoador;
-    private readonly IDoadorRepositorio _doadorRepositorio;
+    private readonly TelaDoacao _telaDoacao;
+    private readonly DoadorRepositorio _doadorRepositorio;
     private readonly DoadorController _doadorController;
 
     public MenuPrincipal(ConnectionFactory connectionFactory)
@@ -19,6 +21,10 @@ public class MenuPrincipal
         _doadorRepositorio = new DoadorRepositorio(connectionFactory);
         _telaDoador = new TelaDoador();
         _doadorController = new DoadorController(_doadorRepositorio, _telaDoador);
+
+        var doacaoRepositorio = new DoacaoRepositorio(connectionFactory);
+        var elegibilidadeService = new ElegibilidadeService();
+        _telaDoacao = new TelaDoacao(doacaoRepositorio, _doadorRepositorio, elegibilidadeService);
     }
 
     /// <summary>
@@ -32,6 +38,7 @@ public class MenuPrincipal
         {
             var opcao = LeitorConsole.LerOpcaoMenu("Menu Principal — Blood Hub", [
                 "Gerenciar Doadores",
+                "Gerenciar Doações",
                 "Relatórios",
                 "Sair"
             ]);
@@ -44,9 +51,12 @@ public class MenuPrincipal
                         await _doadorController.ExecutarMenuAsync();
                         break;
                     case 2:
-                        await ExibirMenuRelatoriosAsync();
+                        await _telaDoacao.ExibirMenuAsync();
                         break;
                     case 3:
+                        await ExibirMenuRelatoriosAsync();
+                        break;
+                    case 4:
                         Console.WriteLine();
                         LeitorConsole.ExibirInfo("Obrigado por usar o Blood Hub. Até mais!");
                         return;
@@ -71,6 +81,7 @@ public class MenuPrincipal
                 "Listar todos os doadores",
                 "Listar doadores ativos",
                 "Listar doadores inativos",
+                "Doadores aptos a doar hoje",
                 "Voltar ao menu principal"
             ]);
 
@@ -99,6 +110,9 @@ public class MenuPrincipal
                         break;
                     }
                     case 4:
+                        await _telaDoacao.ExibirDoadoresAptosHojeAsync();
+                        break;
+                    case 5:
                         return;
                 }
             }
