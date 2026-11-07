@@ -6,7 +6,7 @@ using MySqlConnector;
 
 namespace BloodHub.Repositorios;
 
-public sealed class DoadorRepositorio(ConnectionFactory factory)
+public sealed class DoadorRepositorio(ConnectionFactory factory) : IDoadorRepositorio
 {
     private const string Colunas = "id, nome, cpf, data_nascimento, tipo_sanguineo, fator_rh, sexo, peso, telefone, email, endereco, ativo, criado_em, atualizado_em";
 
