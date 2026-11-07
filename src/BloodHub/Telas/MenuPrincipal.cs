@@ -1,25 +1,31 @@
 using BloodHub.Data;
 using BloodHub.Repositorios;
+using BloodHub.Servicos;
 
 namespace BloodHub.Telas;
 
 /// <summary>
-/// Menu principal da aplicação Blood Hub.
-/// Integra todas as telas e opções disponíveis.
+/// Menu principal da aplicacao Blood Hub.
+/// Integra todas as telas e opcoes disponiveis.
 /// </summary>
 public class MenuPrincipal
 {
     private readonly TelaDoador _telaDoador;
+    private readonly TelaDoacao _telaDoacao;
     private readonly DoadorRepositorio _doadorRepositorio;
 
     public MenuPrincipal(ConnectionFactory connectionFactory)
     {
         _doadorRepositorio = new DoadorRepositorio(connectionFactory);
         _telaDoador = new TelaDoador(_doadorRepositorio);
+
+        var doacaoRepositorio = new DoacaoRepositorio(connectionFactory);
+        var elegibilidadeService = new ElegibilidadeService();
+        _telaDoacao = new TelaDoacao(doacaoRepositorio, _doadorRepositorio, elegibilidadeService);
     }
 
     /// <summary>
-    /// Exibe o menu principal e processa a opção escolhida em loop.
+    /// Exibe o menu principal e processa a opcao escolhida em loop.
     /// </summary>
     public async Task ExecutarAsync()
     {
@@ -27,9 +33,10 @@ public class MenuPrincipal
 
         while (true)
         {
-            var opcao = LeitorConsole.LerOpcaoMenu("Menu Principal — Blood Hub", [
+            var opcao = LeitorConsole.LerOpcaoMenu("Menu Principal - Blood Hub", [
                 "Gerenciar Doadores",
-                "Relatórios",
+                "Gerenciar Doacoes",
+                "Relatorios",
                 "Sair"
             ]);
 
@@ -41,11 +48,14 @@ public class MenuPrincipal
                         await _telaDoador.ExibirMenuAsync();
                         break;
                     case 2:
-                        await ExibirMenuRelatoriosAsync();
+                        await _telaDoacao.ExibirMenuAsync();
                         break;
                     case 3:
+                        await ExibirMenuRelatoriosAsync();
+                        break;
+                    case 4:
                         Console.WriteLine();
-                        LeitorConsole.ExibirInfo("Obrigado por usar o Blood Hub. Até mais!");
+                        LeitorConsole.ExibirInfo("Obrigado por usar o Blood Hub. Ate mais!");
                         return;
                 }
             }
@@ -58,16 +68,17 @@ public class MenuPrincipal
     }
 
     /// <summary>
-    /// Submenu de relatórios — exibição de dados em formato tabela.
+    /// Submenu de relatorios — exibicao de dados em formato tabela.
     /// </summary>
     private async Task ExibirMenuRelatoriosAsync()
     {
         while (true)
         {
-            var opcao = LeitorConsole.LerOpcaoMenu("Relatórios", [
+            var opcao = LeitorConsole.LerOpcaoMenu("Relatorios", [
                 "Listar todos os doadores",
                 "Listar doadores ativos",
                 "Listar doadores inativos",
+                "Doadores aptos a doar hoje",
                 "Voltar ao menu principal"
             ]);
 
@@ -96,12 +107,15 @@ public class MenuPrincipal
                         break;
                     }
                     case 4:
+                        await _telaDoacao.ExibirDoadoresAptosHojeAsync();
+                        break;
+                    case 5:
                         return;
                 }
             }
             catch (Exception ex)
             {
-                LeitorConsole.ExibirErro($"Erro ao gerar relatório: {ex.Message}");
+                LeitorConsole.ExibirErro($"Erro ao gerar relatorio: {ex.Message}");
             }
 
             LeitorConsole.AguardarEnter();
