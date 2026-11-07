@@ -4,3 +4,4 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON bloodhub_tests.* TO 'bloodhub'@'%';
 USE bloodhub_tests;
 SOURCE /docker-entrypoint-initdb.d/002_create_doadores.sql;
 SOURCE /docker-entrypoint-initdb.d/003_create_doacoes.sql;
+SOURCE /docker-entrypoint-initdb.d/004_add_colunas_doacao.sql;
