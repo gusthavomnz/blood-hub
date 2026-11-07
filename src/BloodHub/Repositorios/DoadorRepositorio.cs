@@ -1,98 +1,74 @@
+using System.ComponentModel.DataAnnotations;
 using BloodHub.Data;
 using BloodHub.Modelos;
+using BloodHub.Validacao;
 using MySqlConnector;
 
 namespace BloodHub.Repositorios;
 
-public class DoadorRepositorio
+public sealed class DoadorRepositorio(ConnectionFactory factory)
 {
-    private readonly ConnectionFactory _factory;
+    private const string Colunas = "id, nome, cpf, data_nascimento, tipo_sanguineo, fator_rh, sexo, peso, telefone, email, endereco, ativo, criado_em, atualizado_em";
 
-    public DoadorRepositorio(ConnectionFactory factory)
+    public async Task<int> InserirAsync(Doador doador)
     {
-        _factory = factory;
+        var dados = Validadores.NormalizarEValidar(doador);
+        const string sql = """
+            INSERT INTO doadores
+                (nome, cpf, data_nascimento, tipo_sanguineo, fator_rh, sexo, peso, telefone, email, endereco, ativo)
+            VALUES
+                (@nome, @cpf, @dataNascimento, @tipoSanguineo, @fatorRh, @sexo, @peso, @telefone, @email, @endereco, @ativo);
+            """;
+
+        await using var conexao = await factory.OpenAsync();
+        await using var comando = new MySqlCommand(sql, conexao);
+        AdicionarParametros(comando, dados);
+        await comando.ExecuteNonQueryAsync();
+        doador.Id = checked((int)comando.LastInsertedId);
+        return doador.Id;
     }
 
-    public async Task InserirAsync(Doador doador)
-    {
-        await using var conn = await _factory.OpenAsync();
-        await using var cmd = conn.CreateCommand();
-
-        cmd.CommandText = @"
-            INSERT INTO doadores (nome, cpf, data_nascimento, tipo_sanguineo, fator_rh, sexo, peso, telefone, email, endereco, ativo)
-            VALUES (@nome, @cpf, @dataNascimento, @tipoSanguineo, @fatorRh, @sexo, @peso, @telefone, @email, @endereco, @ativo)";
-
-        cmd.Parameters.AddWithValue("@nome", doador.Nome);
-        cmd.Parameters.AddWithValue("@cpf", doador.Cpf);
-        cmd.Parameters.AddWithValue("@dataNascimento", doador.DataNascimento);
-        cmd.Parameters.AddWithValue("@tipoSanguineo", doador.TipoSanguineo);
-        cmd.Parameters.AddWithValue("@fatorRh", doador.FatorRh);
-        cmd.Parameters.AddWithValue("@sexo", doador.Sexo);
-        cmd.Parameters.AddWithValue("@peso", doador.Peso);
-        cmd.Parameters.AddWithValue("@telefone", doador.Telefone);
-        cmd.Parameters.AddWithValue("@email", (object?)doador.Email ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("@endereco", (object?)doador.Endereco ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("@ativo", doador.Ativo);
-
-        await cmd.ExecuteNonQueryAsync();
-        doador.Id = (int)cmd.LastInsertedId;
-    }
-
-    public async Task<List<Doador>> ListarTodosAsync()
-    {
-        await using var conn = await _factory.OpenAsync();
-        await using var cmd = conn.CreateCommand();
-
-        cmd.CommandText = "SELECT * FROM doadores ORDER BY nome";
-
-        await using var reader = await cmd.ExecuteReaderAsync();
-        return await LerListaAsync(reader);
-    }
+    public Task<List<Doador>> ListarTodosAsync() => ConsultarAsync(
+        $"SELECT {Colunas} FROM doadores ORDER BY nome, id;");
 
     public async Task<Doador?> BuscarPorIdAsync(int id)
     {
-        await using var conn = await _factory.OpenAsync();
-        await using var cmd = conn.CreateCommand();
-
-        cmd.CommandText = "SELECT * FROM doadores WHERE id = @id";
-        cmd.Parameters.AddWithValue("@id", id);
-
-        await using var reader = await cmd.ExecuteReaderAsync();
-        var lista = await LerListaAsync(reader);
-        return lista.Count > 0 ? lista[0] : null;
+        ValidarId(id);
+        var doadores = await ConsultarAsync(
+            $"SELECT {Colunas} FROM doadores WHERE id = @id;",
+            comando => comando.Parameters.AddWithValue("@id", id));
+        return doadores.SingleOrDefault();
     }
 
     public async Task<Doador?> BuscarPorCpfAsync(string cpf)
     {
-        await using var conn = await _factory.OpenAsync();
-        await using var cmd = conn.CreateCommand();
-
-        cmd.CommandText = "SELECT * FROM doadores WHERE cpf = @cpf";
-        cmd.Parameters.AddWithValue("@cpf", cpf);
-
-        await using var reader = await cmd.ExecuteReaderAsync();
-        var lista = await LerListaAsync(reader);
-        return lista.Count > 0 ? lista[0] : null;
+        var cpfNormalizado = Validadores.NormalizarCpf(cpf);
+        var doadores = await ConsultarAsync(
+            $"SELECT {Colunas} FROM doadores WHERE cpf = @cpf;",
+            comando => comando.Parameters.AddWithValue("@cpf", cpfNormalizado));
+        return doadores.SingleOrDefault();
     }
 
-    public async Task<List<Doador>> BuscarPorNomeAsync(string nome)
+    public Task<List<Doador>> BuscarPorNomeAsync(string nome)
     {
-        await using var conn = await _factory.OpenAsync();
-        await using var cmd = conn.CreateCommand();
+        if (string.IsNullOrWhiteSpace(nome))
+            throw new ValidationException("Informe um nome ou parte dele para buscar.");
 
-        cmd.CommandText = "SELECT * FROM doadores WHERE nome LIKE @nome ORDER BY nome";
-        cmd.Parameters.AddWithValue("@nome", $"%{nome}%");
+        var trecho = nome.Trim();
+        if (trecho.Length > 120)
+            throw new ValidationException("O nome para busca deve ter no máximo 120 caracteres.");
 
-        await using var reader = await cmd.ExecuteReaderAsync();
-        return await LerListaAsync(reader);
+        var padrao = "%" + trecho.Replace("!", "!!").Replace("%", "!%").Replace("_", "!_") + "%";
+        return ConsultarAsync(
+            $"SELECT {Colunas} FROM doadores WHERE nome LIKE @nome ESCAPE '!' ORDER BY nome, id;",
+            comando => comando.Parameters.AddWithValue("@nome", padrao));
     }
 
-    public async Task AtualizarAsync(Doador doador)
+    public async Task<bool> AtualizarAsync(Doador doador)
     {
-        await using var conn = await _factory.OpenAsync();
-        await using var cmd = conn.CreateCommand();
-
-        cmd.CommandText = @"
+        ValidarId(doador.Id);
+        var dados = Validadores.NormalizarEValidar(doador);
+        const string sql = """
             UPDATE doadores
             SET nome = @nome,
                 cpf = @cpf,
@@ -105,71 +81,85 @@ public class DoadorRepositorio
                 email = @email,
                 endereco = @endereco,
                 ativo = @ativo
-            WHERE id = @id";
+            WHERE id = @id;
+            """;
 
-        cmd.Parameters.AddWithValue("@id", doador.Id);
-        cmd.Parameters.AddWithValue("@nome", doador.Nome);
-        cmd.Parameters.AddWithValue("@cpf", doador.Cpf);
-        cmd.Parameters.AddWithValue("@dataNascimento", doador.DataNascimento);
-        cmd.Parameters.AddWithValue("@tipoSanguineo", doador.TipoSanguineo);
-        cmd.Parameters.AddWithValue("@fatorRh", doador.FatorRh);
-        cmd.Parameters.AddWithValue("@sexo", doador.Sexo);
-        cmd.Parameters.AddWithValue("@peso", doador.Peso);
-        cmd.Parameters.AddWithValue("@telefone", doador.Telefone);
-        cmd.Parameters.AddWithValue("@email", (object?)doador.Email ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("@endereco", (object?)doador.Endereco ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("@ativo", doador.Ativo);
-
-        await cmd.ExecuteNonQueryAsync();
+        await using var conexao = await factory.OpenAsync();
+        await using var comando = new MySqlCommand(sql, conexao);
+        AdicionarParametros(comando, dados);
+        comando.Parameters.AddWithValue("@id", dados.Id);
+        return await comando.ExecuteNonQueryAsync() > 0;
     }
 
-    public async Task ExcluirAsync(int id)
+    public Task<bool> ExcluirAsync(int id)
     {
-        await using var conn = await _factory.OpenAsync();
-        await using var cmd = conn.CreateCommand();
-
-        cmd.CommandText = "DELETE FROM doadores WHERE id = @id";
-        cmd.Parameters.AddWithValue("@id", id);
-
-        await cmd.ExecuteNonQueryAsync();
+        ValidarId(id);
+        return ExecutarAsync("DELETE FROM doadores WHERE id = @id;", id);
     }
 
-    public async Task InativarAsync(int id)
+    public Task<bool> InativarAsync(int id)
     {
-        await using var conn = await _factory.OpenAsync();
-        await using var cmd = conn.CreateCommand();
-
-        cmd.CommandText = "UPDATE doadores SET ativo = 0 WHERE id = @id";
-        cmd.Parameters.AddWithValue("@id", id);
-
-        await cmd.ExecuteNonQueryAsync();
+        ValidarId(id);
+        return ExecutarAsync("UPDATE doadores SET ativo = FALSE WHERE id = @id;", id);
     }
 
-    private static async Task<List<Doador>> LerListaAsync(MySqlDataReader reader)
+    private async Task<List<Doador>> ConsultarAsync(string sql, Action<MySqlCommand>? configurar = null)
     {
-        var lista = new List<Doador>();
+        await using var conexao = await factory.OpenAsync();
+        await using var comando = new MySqlCommand(sql, conexao);
+        configurar?.Invoke(comando);
+        await using var leitor = await comando.ExecuteReaderAsync();
 
-        while (await reader.ReadAsync())
-        {
-            lista.Add(new Doador
-            {
-                Id = reader.GetInt32("id"),
-                Nome = reader.GetString("nome"),
-                Cpf = reader.GetString("cpf"),
-                DataNascimento = reader.GetDateTime("data_nascimento"),
-                TipoSanguineo = reader.GetString("tipo_sanguineo"),
-                FatorRh = reader.GetString("fator_rh"),
-                Sexo = reader.GetString("sexo"),
-                Peso = reader.GetDecimal("peso"),
-                Telefone = reader.GetString("telefone"),
-                Email = reader.IsDBNull(reader.GetOrdinal("email")) ? null : reader.GetString("email"),
-                Endereco = reader.IsDBNull(reader.GetOrdinal("endereco")) ? null : reader.GetString("endereco"),
-                Ativo = reader.GetBoolean("ativo"),
-                CriadoEm = reader.GetDateTime("criado_em"),
-                AtualizadoEm = reader.GetDateTime("atualizado_em"),
-            });
-        }
+        var doadores = new List<Doador>();
+        while (await leitor.ReadAsync())
+            doadores.Add(Mapear(leitor));
+        return doadores;
+    }
 
-        return lista;
+    private async Task<bool> ExecutarAsync(string sql, int id)
+    {
+        await using var conexao = await factory.OpenAsync();
+        await using var comando = new MySqlCommand(sql, conexao);
+        comando.Parameters.AddWithValue("@id", id);
+        return await comando.ExecuteNonQueryAsync() > 0;
+    }
+
+    private static void AdicionarParametros(MySqlCommand comando, Doador doador)
+    {
+        comando.Parameters.AddWithValue("@nome", doador.Nome);
+        comando.Parameters.AddWithValue("@cpf", doador.Cpf);
+        comando.Parameters.AddWithValue("@dataNascimento", doador.DataNascimento.Date);
+        comando.Parameters.AddWithValue("@tipoSanguineo", doador.TipoSanguineo);
+        comando.Parameters.AddWithValue("@fatorRh", doador.FatorRh);
+        comando.Parameters.AddWithValue("@sexo", doador.Sexo);
+        comando.Parameters.AddWithValue("@peso", doador.Peso);
+        comando.Parameters.AddWithValue("@telefone", (object?)doador.Telefone ?? DBNull.Value);
+        comando.Parameters.AddWithValue("@email", (object?)doador.Email ?? DBNull.Value);
+        comando.Parameters.AddWithValue("@endereco", (object?)doador.Endereco ?? DBNull.Value);
+        comando.Parameters.AddWithValue("@ativo", doador.Ativo);
+    }
+
+    private static Doador Mapear(MySqlDataReader leitor) => new()
+    {
+        Id = leitor.GetInt32("id"),
+        Nome = leitor.GetString("nome"),
+        Cpf = leitor.GetString("cpf"),
+        DataNascimento = leitor.GetDateTime("data_nascimento"),
+        TipoSanguineo = leitor.GetString("tipo_sanguineo"),
+        FatorRh = leitor.GetString("fator_rh"),
+        Sexo = leitor.GetString("sexo"),
+        Peso = leitor.GetDecimal("peso"),
+        Telefone = leitor.IsDBNull(leitor.GetOrdinal("telefone")) ? null : leitor.GetString("telefone"),
+        Email = leitor.IsDBNull(leitor.GetOrdinal("email")) ? null : leitor.GetString("email"),
+        Endereco = leitor.IsDBNull(leitor.GetOrdinal("endereco")) ? null : leitor.GetString("endereco"),
+        Ativo = leitor.GetBoolean("ativo"),
+        CriadoEm = leitor.GetDateTime("criado_em"),
+        AtualizadoEm = leitor.GetDateTime("atualizado_em")
+    };
+
+    private static void ValidarId(int id)
+    {
+        if (id <= 0)
+            throw new ValidationException("O ID do doador deve ser um número positivo.");
     }
 }

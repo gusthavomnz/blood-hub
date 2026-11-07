@@ -1,5 +1,6 @@
 using BloodHub.Data;
 using BloodHub.Telas;
+using BloodHub.Validacao;
 using MySqlConnector;
 
 var connectionFactory = new ConnectionFactory(DatabaseSettings.FromEnvironment());
@@ -11,7 +12,8 @@ try
 }
 catch (MySqlException ex)
 {
-    Console.Error.WriteLine($"Falha ao conectar no banco: {ex.Message}");
+    var mensagem = TradutorErroBanco.Traduzir(ex);
+    Console.Error.WriteLine(mensagem ?? $"Falha ao conectar no banco: {ex.Message}");
     return 1;
 }
 

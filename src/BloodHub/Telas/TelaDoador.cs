@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using BloodHub.Modelos;
 using BloodHub.Repositorios;
 using BloodHub.Validacao;
@@ -50,6 +51,10 @@ public class TelaDoador
             {
                 var msg = TradutorErroBanco.Traduzir(ex);
                 LeitorConsole.ExibirErro(msg ?? $"Erro de banco de dados: {ex.Message}");
+            }
+            catch (ValidationException ex)
+            {
+                LeitorConsole.ExibirErro(ex.Message);
             }
             catch (Exception ex)
             {
@@ -353,7 +358,7 @@ public class TelaDoador
         doador.Sexo = LeitorConsole.LerTexto("Sexo (M ou F): ").ToUpper();
 
         doador.Peso = LeitorConsole.LerDecimal("Peso em kg (ex: 65,5): ");
-        doador.Telefone = LeitorConsole.LerTexto("Telefone: ");
+        doador.Telefone = LeitorConsole.LerTextoOpcional("Telefone (opcional): ");
         doador.Email = LeitorConsole.LerTextoOpcional("E-mail (opcional): ");
         doador.Endereco = LeitorConsole.LerTextoOpcional("Endereço (opcional): ");
 

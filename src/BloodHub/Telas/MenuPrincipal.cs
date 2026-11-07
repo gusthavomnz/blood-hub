@@ -9,13 +9,11 @@ namespace BloodHub.Telas;
 /// </summary>
 public class MenuPrincipal
 {
-    private readonly ConnectionFactory _connectionFactory;
     private readonly TelaDoador _telaDoador;
     private readonly DoadorRepositorio _doadorRepositorio;
 
     public MenuPrincipal(ConnectionFactory connectionFactory)
     {
-        _connectionFactory = connectionFactory;
         _doadorRepositorio = new DoadorRepositorio(connectionFactory);
         _telaDoador = new TelaDoador(_doadorRepositorio);
     }

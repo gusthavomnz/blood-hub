@@ -10,10 +10,11 @@ public class Doador
     public string FatorRh { get; set; } = string.Empty;
     public string Sexo { get; set; } = string.Empty;
     public decimal Peso { get; set; }
-    public string Telefone { get; set; } = string.Empty;
+    public string? Telefone { get; set; }
     public string? Email { get; set; }
     public string? Endereco { get; set; }
     public bool Ativo { get; set; } = true;
     public DateTime CriadoEm { get; set; }
     public DateTime AtualizadoEm { get; set; }
+    public List<Doacao> Doacoes { get; set; } = [];
 }

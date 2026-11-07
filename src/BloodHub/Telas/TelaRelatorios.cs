@@ -55,7 +55,7 @@ public static class TelaRelatorios
                 $"{d.TipoSanguineo}{d.FatorRh}",
                 d.Sexo,
                 $"{d.Peso:F1}",
-                d.Telefone,
+                d.Telefone ?? "—",
                 d.Ativo ? "Sim" : "Não"));
         }
 

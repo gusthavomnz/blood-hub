@@ -8,4 +8,5 @@ public class Doacao
     public int VolumeMl { get; set; }
     public string? Observacao { get; set; }
     public DateTime CriadoEm { get; set; }
+    public Doador? Doador { get; set; }
 }
