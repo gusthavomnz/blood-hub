@@ -1,3 +1,4 @@
+using System.Globalization;
 using BloodHub.Modelos;
 
 namespace BloodHub.Telas;
@@ -67,6 +68,109 @@ public static class TelaRelatorios
     }
 
     /// <summary>
+    /// Exibe o relatório agregado de doações e volume coletado agrupados por tipo sanguíneo (GROUP BY).
+    /// </summary>
+    public static void ExibirTabelaTipoSanguineo(List<ResumoPorTipoSanguineo> dados)
+    {
+        if (dados.Count == 0)
+        {
+            LeitorConsole.ExibirInfo("Nenhuma doação realizada encontrada para gerar estatísticas por tipo sanguíneo.");
+            return;
+        }
+
+        const int colTipo = 16;
+        const int colTotal = 18;
+        const int colVolumeMl = 22;
+        const int colVolumeL = 16;
+
+        var larguras = new[] { colTipo, colTotal, colVolumeMl, colVolumeL };
+        var separador = MontarSeparador(larguras);
+
+        Console.WriteLine();
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine("══════ Total de Doações e Volume por Tipo Sanguíneo (GROUP BY) ══════");
+        Console.WriteLine(separador);
+        Console.WriteLine(MontarLinhaGenerica(larguras, "Tipo Sanguíneo", "Total de Doações", "Volume Coletado (mL)", "Volume (Litros)"));
+        Console.WriteLine(separador);
+        Console.ResetColor();
+
+        int totalGeralDoacoes = 0;
+        long totalGeralVolumeMl = 0;
+
+        foreach (var r in dados)
+        {
+            totalGeralDoacoes += r.TotalDoacoes;
+            totalGeralVolumeMl += r.VolumeTotalMl;
+
+            Console.WriteLine(MontarLinhaGenerica(
+                larguras,
+                r.TipoSanguineo,
+                r.TotalDoacoes.ToString("N0", CultureInfo.GetCultureInfo("pt-BR")),
+                $"{r.VolumeTotalMl:N0} mL",
+                $"{(r.VolumeTotalMl / 1000.0):F2} L"));
+        }
+
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine(separador);
+        Console.ResetColor();
+
+        Console.WriteLine($"  Total Geral: {totalGeralDoacoes:N0} doação(ões) | {totalGeralVolumeMl:N0} mL ({(totalGeralVolumeMl / 1000.0):F2} L)");
+    }
+
+    /// <summary>
+    /// Exibe o relatório de doações agregadas por ano e mês (GROUP BY).
+    /// </summary>
+    public static void ExibirTabelaDoacoesPorMes(List<DoacoesPorMes> dados)
+    {
+        if (dados.Count == 0)
+        {
+            LeitorConsole.ExibirInfo("Nenhuma doação realizada encontrada para gerar estatísticas mensais.");
+            return;
+        }
+
+        const int colPeriodo = 20;
+        const int colTotal = 18;
+        const int colVolumeMl = 22;
+        const int colVolumeL = 16;
+
+        var larguras = new[] { colPeriodo, colTotal, colVolumeMl, colVolumeL };
+        var separador = MontarSeparador(larguras);
+
+        Console.WriteLine();
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine("══════ Doações Realizadas por Mês (GROUP BY) ══════");
+        Console.WriteLine(separador);
+        Console.WriteLine(MontarLinhaGenerica(larguras, "Ano / Mês", "Total de Doações", "Volume Coletado (mL)", "Volume (Litros)"));
+        Console.WriteLine(separador);
+        Console.ResetColor();
+
+        int totalGeralDoacoes = 0;
+        long totalGeralVolumeMl = 0;
+
+        foreach (var r in dados)
+        {
+            totalGeralDoacoes += r.TotalDoacoes;
+            totalGeralVolumeMl += r.VolumeTotalMl;
+
+            var nomeMes = CultureInfo.GetCultureInfo("pt-BR").DateTimeFormat.GetMonthName(r.Mes);
+            var periodo = $"{r.Ano} / {char.ToUpper(nomeMes[0])}{nomeMes[1..]}";
+
+            Console.WriteLine(MontarLinhaGenerica(
+                larguras,
+                periodo,
+                r.TotalDoacoes.ToString("N0", CultureInfo.GetCultureInfo("pt-BR")),
+                $"{r.VolumeTotalMl:N0} mL",
+                $"{(r.VolumeTotalMl / 1000.0):F2} L"));
+        }
+
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine(separador);
+        Console.ResetColor();
+
+        Console.WriteLine($"  Total Geral: {totalGeralDoacoes:N0} doação(ões) | {totalGeralVolumeMl:N0} mL ({(totalGeralVolumeMl / 1000.0):F2} L)");
+    }
+
+    /// <summary>
     /// Exibe os detalhes completos de um doador.
     /// </summary>
     public static void ExibirDetalhesDoador(Doador d)
@@ -83,7 +187,7 @@ public static class TelaRelatorios
         Console.WriteLine($"  Tipo Sanguíneo...: {d.TipoSanguineo}{d.FatorRh}");
         Console.WriteLine($"  Sexo.............: {(d.Sexo == "M" ? "Masculino" : "Feminino")}");
         Console.WriteLine($"  Peso.............: {d.Peso:F1} kg");
-        Console.WriteLine($"  Telefone.........: {d.Telefone}");
+        Console.WriteLine($"  Telefone.........: {d.Telefone ?? "(não informado)"}");
         Console.WriteLine($"  E-mail...........: {d.Email ?? "(não informado)"}");
         Console.WriteLine($"  Endereço.........: {d.Endereco ?? "(não informado)"}");
         Console.WriteLine($"  Ativo............: {(d.Ativo ? "Sim" : "Não")}");
@@ -108,6 +212,20 @@ public static class TelaRelatorios
         string v1, string v2, string v3, string v4, string v5, string v6, string v7, string v8, string v9)
     {
         return $"| {v1.PadRight(c1)} | {v2.PadRight(c2)} | {v3.PadRight(c3)} | {v4.PadRight(c4)} | {v5.PadRight(c5)} | {v6.PadRight(c6)} | {v7.PadRight(c7)} | {v8.PadRight(c8)} | {v9.PadRight(c9)} |";
+    }
+
+    /// <summary>
+    /// Monta uma linha genérica da tabela com valores alinhados com base no vetor de larguras.
+    /// </summary>
+    private static string MontarLinhaGenerica(int[] larguras, params string[] valores)
+    {
+        var partes = new string[larguras.Length];
+        for (int i = 0; i < larguras.Length; i++)
+        {
+            var val = i < valores.Length ? valores[i] : string.Empty;
+            partes[i] = Truncar(val, larguras[i]).PadRight(larguras[i]);
+        }
+        return $"| {string.Join(" | ", partes)} |";
     }
 
     /// <summary>

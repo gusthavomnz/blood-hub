@@ -15,6 +15,7 @@ public class MenuPrincipal
     private readonly TelaDoacao _telaDoacao;
     private readonly DoadorRepositorio _doadorRepositorio;
     private readonly DoadorController _doadorController;
+    private readonly IRelatorioRepositorio _relatorioRepositorio;
 
     public MenuPrincipal(ConnectionFactory connectionFactory)
     {
@@ -25,6 +26,8 @@ public class MenuPrincipal
         var doacaoRepositorio = new DoacaoRepositorio(connectionFactory);
         var elegibilidadeService = new ElegibilidadeService();
         _telaDoacao = new TelaDoacao(doacaoRepositorio, _doadorRepositorio, elegibilidadeService);
+
+        _relatorioRepositorio = new RelatorioRepositorio(connectionFactory);
     }
 
     /// <summary>
@@ -39,7 +42,7 @@ public class MenuPrincipal
             var opcao = LeitorConsole.LerOpcaoMenu("Menu Principal — Blood Hub", [
                 "Gerenciar Doadores",
                 "Gerenciar Doações",
-                "Relatórios",
+                "Relatórios e Estatísticas",
                 "Sair"
             ]);
 
@@ -71,17 +74,19 @@ public class MenuPrincipal
     }
 
     /// <summary>
-    /// Submenu de relatórios — exibição de dados em formato tabela.
+    /// Submenu de relatórios — exibição de dados e agregações em formato de tabela.
     /// </summary>
     private async Task ExibirMenuRelatoriosAsync()
     {
         while (true)
         {
-            var opcao = LeitorConsole.LerOpcaoMenu("Relatórios", [
+            var opcao = LeitorConsole.LerOpcaoMenu("Relatórios e Estatísticas", [
                 "Listar todos os doadores",
                 "Listar doadores ativos",
                 "Listar doadores inativos",
                 "Doadores aptos a doar hoje",
+                "Total de doações e volume por tipo sanguíneo (GROUP BY)",
+                "Doações realizadas por mês (GROUP BY)",
                 "Voltar ao menu principal"
             ]);
 
@@ -113,6 +118,18 @@ public class MenuPrincipal
                         await _telaDoacao.ExibirDoadoresAptosHojeAsync();
                         break;
                     case 5:
+                    {
+                        var dados = await _relatorioRepositorio.TotalPorTipoSanguineoAsync();
+                        TelaRelatorios.ExibirTabelaTipoSanguineo(dados);
+                        break;
+                    }
+                    case 6:
+                    {
+                        var dados = await _relatorioRepositorio.DoacoesPorMesAsync();
+                        TelaRelatorios.ExibirTabelaDoacoesPorMes(dados);
+                        break;
+                    }
+                    case 7:
                         return;
                 }
             }
