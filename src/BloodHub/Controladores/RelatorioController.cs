@@ -3,10 +3,6 @@ using BloodHub.Telas;
 
 namespace BloodHub.Controladores;
 
-/// <summary>
-/// Controlador responsável por orquestrar o submenu de relatórios e estatísticas.
-/// Segue o padrão MVC puro: coordena repositórios e views sem realizar I/O de console diretamente.
-/// </summary>
 public sealed class RelatorioController(
     IDoadorRepositorio doadorRepositorio,
     IRelatorioRepositorio relatorioRepositorio,
@@ -19,9 +15,6 @@ public sealed class RelatorioController(
     private readonly TelaDoacao _telaDoacao =
         telaDoacao ?? throw new ArgumentNullException(nameof(telaDoacao));
 
-    /// <summary>
-    /// Loop principal do submenu de relatórios e estatísticas.
-    /// </summary>
     public async Task ExecutarMenuAsync()
     {
         while (true)
@@ -57,8 +50,6 @@ public sealed class RelatorioController(
             LeitorConsole.AguardarEnter();
         }
     }
-
-    // ──────────────────────── OPÇÕES DO MENU ────────────────────────
 
     private async Task ListarTodosAsync()
     {

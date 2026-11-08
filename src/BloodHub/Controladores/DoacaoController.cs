@@ -4,18 +4,11 @@ using BloodHub.Repositorios;
 
 namespace BloodHub.Controladores;
 
-/// <summary>
-/// Controlador responsável por orquestrar o fluxo de dados, validações e persistência de Doações.
-/// Segue a arquitetura MVC pura, sem interação direta com o console (I/O).
-/// </summary>
 public sealed class DoacaoController(IDoacaoRepositorio doacaoRepositorio, IDoadorRepositorio doadorRepositorio)
 {
     private readonly IDoacaoRepositorio _doacaoRepositorio = doacaoRepositorio ?? throw new ArgumentNullException(nameof(doacaoRepositorio));
     private readonly IDoadorRepositorio _doadorRepositorio = doadorRepositorio ?? throw new ArgumentNullException(nameof(doadorRepositorio));
 
-    /// <summary>
-    /// Registra uma nova doação no sistema após validar a existência e atividade do doador.
-    /// </summary>
     public async Task<Doacao> RegistrarAsync(Doacao doacao)
     {
         ArgumentNullException.ThrowIfNull(doacao);
@@ -27,7 +20,6 @@ public sealed class DoacaoController(IDoacaoRepositorio doacaoRepositorio, IDoad
         if (!doador.Ativo)
             throw new ValidationException("Não é permitido registrar doações para um doador inativo.");
 
-        // Normalização de dados
         doacao.LocalColeta = string.IsNullOrWhiteSpace(doacao.LocalColeta) ? "Hemocentro Central" : doacao.LocalColeta.Trim();
         doacao.Status = string.IsNullOrWhiteSpace(doacao.Status) ? "Realizada" : doacao.Status.Trim();
         doacao.MotivoRecusa = string.IsNullOrWhiteSpace(doacao.MotivoRecusa) ? null : doacao.MotivoRecusa.Trim();
@@ -38,23 +30,14 @@ public sealed class DoacaoController(IDoacaoRepositorio doacaoRepositorio, IDoad
         return doacao;
     }
 
-    /// <summary>
-    /// Retorna todas as doações com os dados completos dos doadores associados (JOIN).
-    /// </summary>
     public Task<List<Doacao>> ListarTodasComDoadorAsync() => _doacaoRepositorio.ListarComDoadorAsync();
 
-    /// <summary>
-    /// Busca uma doação específica pelo seu ID.
-    /// </summary>
     public Task<Doacao?> BuscarPorIdAsync(int id)
     {
         ValidarId(id);
         return _doacaoRepositorio.BuscarPorIdAsync(id);
     }
 
-    /// <summary>
-    /// Lista o histórico de todas as doações de um doador específico.
-    /// </summary>
     public async Task<List<Doacao>> ListarPorDoadorAsync(int doadorId)
     {
         ValidarId(doadorId, "O ID do doador deve ser positivo.");
@@ -64,18 +47,12 @@ public sealed class DoacaoController(IDoacaoRepositorio doacaoRepositorio, IDoad
         return await _doacaoRepositorio.ListarPorDoadorAsync(doadorId);
     }
 
-    /// <summary>
-    /// Lista o histórico exclusivo de doações 'Realizadas' de um doador (usado pelo motor de elegibilidade).
-    /// </summary>
     public Task<List<Doacao>> ObterHistoricoRealizadasAsync(int doadorId)
     {
         ValidarId(doadorId, "O ID do doador deve ser positivo.");
         return _doacaoRepositorio.ListarRealizadasDoDoadorAsync(doadorId);
     }
 
-    /// <summary>
-    /// Lista doações realizadas dentro de um intervalo de datas com os doadores associados.
-    /// </summary>
     public Task<List<Doacao>> ListarPorPeriodoAsync(DateTime inicio, DateTime fim)
     {
         if (inicio.Date > fim.Date)
@@ -84,9 +61,6 @@ public sealed class DoacaoController(IDoacaoRepositorio doacaoRepositorio, IDoad
         return _doacaoRepositorio.ListarPorPeriodoAsync(inicio, fim);
     }
 
-    /// <summary>
-    /// Atualiza os dados de uma doação existente.
-    /// </summary>
     public async Task<bool> AtualizarAsync(Doacao doacao)
     {
         ArgumentNullException.ThrowIfNull(doacao);
@@ -102,9 +76,6 @@ public sealed class DoacaoController(IDoacaoRepositorio doacaoRepositorio, IDoad
         return await _doacaoRepositorio.AtualizarAsync(doacao);
     }
 
-    /// <summary>
-    /// Remove uma doação do sistema pelo seu identificador.
-    /// </summary>
     public async Task<bool> ExcluirAsync(int id)
     {
         ValidarId(id);

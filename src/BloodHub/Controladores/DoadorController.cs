@@ -7,19 +7,11 @@ using MySqlConnector;
 
 namespace BloodHub.Controladores;
 
-/// <summary>
-/// Controlador responsável pelo fluxo de navegação, validação e persistência do Doador.
-/// Segue o padrão MVC puro: orquestra a View (TelaDoador) e o Model/Data (IDoadorRepositorio),
-/// sem realizar I/O de console diretamente.
-/// </summary>
 public sealed class DoadorController(IDoadorRepositorio repositorio, TelaDoador tela)
 {
     private readonly IDoadorRepositorio _repositorio = repositorio ?? throw new ArgumentNullException(nameof(repositorio));
     private readonly TelaDoador _tela = tela ?? throw new ArgumentNullException(nameof(tela));
 
-    /// <summary>
-    /// Loop principal de navegação do menu de doadores.
-    /// </summary>
     public async Task ExecutarMenuAsync()
     {
         while (true)

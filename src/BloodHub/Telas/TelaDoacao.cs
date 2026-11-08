@@ -7,11 +7,6 @@ using MySqlConnector;
 
 namespace BloodHub.Telas;
 
-/// <summary>
-/// Interface de terminal para o CRUD de Doação e consulta de doadores aptos.
-/// Consome IDoacaoRepositorio, DoadorRepositorio e IElegibilidadeService.
-/// Nunca acessa o banco diretamente nem escreve SQL.
-/// </summary>
 public class TelaDoacao
 {
     private readonly IDoacaoRepositorio _doacaoRepositorio;
@@ -28,9 +23,6 @@ public class TelaDoacao
         _elegibilidadeService = elegibilidadeService;
     }
 
-    /// <summary>
-    /// Exibe o submenu de doações e processa a opção escolhida em loop.
-    /// </summary>
     public async Task ExibirMenuAsync()
     {
         while (true)
@@ -76,8 +68,6 @@ public class TelaDoacao
         }
     }
 
-    // ──────────────────────── REGISTRAR ────────────────────────
-
     private async Task RegistrarAsync()
     {
         Console.WriteLine();
@@ -85,14 +75,12 @@ public class TelaDoacao
         Console.WriteLine("══════ Registrar Nova Doação ══════");
         Console.ResetColor();
 
-        // 1. Localizar o doador por ID ou CPF
         var doador = await LocalizarDoadorAsync();
         if (doador is null) return;
 
         TelaRelatorios.ExibirDetalhesDoador(doador);
         Console.WriteLine();
 
-        // 2. Coletar dados da triagem
         var dataDoacao = LeitorConsole.LerData("Data da doação (dd/MM/yyyy): ");
         var pesoKg = LeitorConsole.LerDecimal("Peso na triagem (kg, ex: 68,5): ");
 
@@ -105,7 +93,6 @@ public class TelaDoacao
                           ?? "Hemocentro Central";
         var observacao = LeitorConsole.LerTextoOpcional("Observação (opcional): ");
 
-        // 3. Verificar elegibilidade com histórico real do banco
         var historico = await _doacaoRepositorio.ListarRealizadasDoDoadorAsync(doador.Id);
         var resultado = _elegibilidadeService.Verificar(doador, historico, dataDoacao, pesoKg);
 
@@ -113,7 +100,6 @@ public class TelaDoacao
 
         if (resultado.Apto)
         {
-            // 4a. Apto — registrar como Realizada
             var doacao = new Doacao
             {
                 DoadorId    = doador.Id,
@@ -130,7 +116,6 @@ public class TelaDoacao
         }
         else
         {
-            // 4b. Reprovado — exibir motivos e oferecer registro como Recusada
             LeitorConsole.ExibirErro("Doador não está apto para doação:");
             foreach (var motivo in resultado.MotivosRecusa)
                 LeitorConsole.ExibirErro($"  • {motivo}");
@@ -161,15 +146,11 @@ public class TelaDoacao
         }
     }
 
-    // ──────────────────────── LISTAR ────────────────────────
-
     private async Task ListarTodasAsync()
     {
         var doacoes = await _doacaoRepositorio.ListarComDoadorAsync();
         ExibirTabelaDoacoes(doacoes);
     }
-
-    // ──────────────────────── FILTRAR ────────────────────────
 
     private async Task FiltrarAsync()
     {
@@ -219,8 +200,6 @@ public class TelaDoacao
         ExibirTabelaDoacoes(doacoes);
     }
 
-    // ──────────────────────── ATUALIZAR ────────────────────────
-
     private async Task AtualizarAsync()
     {
         var id = LeitorConsole.LerInt("ID da doação a atualizar: ");
@@ -265,8 +244,6 @@ public class TelaDoacao
             LeitorConsole.ExibirErro("Nenhum registro foi alterado.");
     }
 
-    // ──────────────────────── EXCLUIR ────────────────────────
-
     private async Task ExcluirAsync()
     {
         var id = LeitorConsole.LerInt("ID da doação a excluir: ");
@@ -294,13 +271,6 @@ public class TelaDoacao
             LeitorConsole.ExibirErro("Nenhum registro foi removido.");
     }
 
-    // ──────────────────────── DOADORES APTOS HOJE ────────────────────────
-
-    /// <summary>
-    /// Lista todos os doadores ativos aptos a realizar uma doação hoje,
-    /// avaliando as regras de elegibilidade com o histórico real de cada um.
-    /// Pode ser chamado pelo MenuPrincipal ou pelo menu interno de doações.
-    /// </summary>
     public async Task ExibirDoadoresAptosHojeAsync()
     {
         Console.WriteLine();
@@ -317,7 +287,6 @@ public class TelaDoacao
         foreach (var doador in todosDoadores.Where(d => d.Ativo))
         {
             var historico = await _doacaoRepositorio.ListarRealizadasDoDoadorAsync(doador.Id);
-            // O peso do cadastro é usado como aproximação — o real é aferido na triagem
             var resultado = _elegibilidadeService.Verificar(doador, historico, DateTime.Today, doador.Peso);
             if (resultado.Apto)
                 aptosHoje.Add(doador);
@@ -329,12 +298,6 @@ public class TelaDoacao
             LeitorConsole.ExibirInfo($"{aptosHoje.Count} doador(es) apto(s) para doar hoje.");
     }
 
-    // ──────────────────────── AUXILIAR DE LEITURA ────────────────────────
-
-    /// <summary>
-    /// Localiza um doador por ID ou CPF conforme escolha do operador.
-    /// Retorna null se não encontrado ou CPF inválido.
-    /// </summary>
     private async Task<Doador?> LocalizarDoadorAsync()
     {
         var opcao = LeitorConsole.LerOpcaoMenu("Localizar Doador por", ["ID", "CPF"]);
@@ -358,12 +321,6 @@ public class TelaDoacao
         }
     }
 
-    // ──────────────────────── EXIBIÇÃO ────────────────────────
-
-    /// <summary>
-    /// Exibe uma lista de doações em formato de tabela alinhada no console.
-    /// Doações recusadas aparecem em cinza; realizadas, em branco.
-    /// </summary>
     private static void ExibirTabelaDoacoes(List<Doacao> doacoes)
     {
         if (doacoes.Count == 0)
@@ -414,9 +371,6 @@ public class TelaDoacao
         Console.WriteLine($"  Total: {doacoes.Count} doação(ões)");
     }
 
-    /// <summary>
-    /// Exibe os detalhes completos de uma única doação.
-    /// </summary>
     private static void ExibirDetalhesDoacao(Doacao d)
     {
         Console.WriteLine();

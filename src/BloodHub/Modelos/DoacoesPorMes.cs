@@ -1,8 +1,5 @@
 namespace BloodHub.Modelos;
 
-/// <summary>
-/// Representa a quantidade de doações e volume coletado agrupados por ano e mês.
-/// </summary>
 public class DoacoesPorMes
 {
     public int Ano { get; set; }

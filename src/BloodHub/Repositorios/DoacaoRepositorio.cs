@@ -5,9 +5,6 @@ using MySqlConnector;
 
 namespace BloodHub.Repositorios;
 
-/// <summary>
-/// Repositório para persistência e consultas da entidade Doação utilizando ADO.NET puro com MySqlConnector.
-/// </summary>
 public sealed class DoacaoRepositorio(ConnectionFactory factory) : IDoacaoRepositorio
 {
     private const string ColunasSimples = @"
@@ -87,9 +84,6 @@ public sealed class DoacaoRepositorio(ConnectionFactory factory) : IDoacaoReposi
         return doacoes.SingleOrDefault();
     }
 
-    /// <summary>
-    /// Consulta que cruza Doações e Doadores com INNER JOIN, preenchendo o objeto Doador em cada doação.
-    /// </summary>
     public Task<List<Doacao>> ListarComDoadorAsync() => ConsultarComDoadorAsync(
         $"""
         SELECT {ColunasComDoador}
@@ -111,10 +105,6 @@ public sealed class DoacaoRepositorio(ConnectionFactory factory) : IDoacaoReposi
             comando => comando.Parameters.AddWithValue("@doadorId", doadorId));
     }
 
-    /// <summary>
-    /// Lista o histórico de doações com status 'Realizada' de um doador,
-    /// ordenado da mais recente para a mais antiga (usado pelo motor de elegibilidade).
-    /// </summary>
     public Task<List<Doacao>> ListarRealizadasDoDoadorAsync(int doadorId)
     {
         ValidarId(doadorId, "O ID do doador informado é inválido.");

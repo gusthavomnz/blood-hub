@@ -113,7 +113,7 @@ No submenu **Relatórios e Estatísticas**, estão disponíveis:
 | Integrante | Responsabilidade | Principais Entregáveis |
 | :--- | :--- | :--- |
 | **1: Infraestrutura e Integração** | Ambiente, Docker, scripts e junção | `docker-compose.yml`, migrations SQL, `global.json`, `README.md`, `ConnectionFactory`, integração e carga inicial. |
-| **2: Doador (dados e validação)** | Persistência e integridade do doador | `DoadorRepositorio`, `Validadores` (CPF, idades, tamanhos), `TradutorErroBanco` e suíte `BloodHub.Checks`. |
+| **2: Doador (dados e validação)** | Persistência e integridade do doador | `DoadorRepositorio`, `Validadores` (CPF, idades, tamanhos) e `TradutorErroBanco`. |
 | **3: Interface do Console** | Experiência de terminal e relatórios | `LeitorConsole`, `TelaRelatorios` (formatação de tabelas), `DoadorController` e menus do sistema. |
 | **4: Doação (dados e consultas)** | Persistência e agregações analíticas | `DoacaoRepositorio` (CRUD, JOINs, filtros), `RelatorioRepositorio` (`GROUP BY`) e `DoacaoController`. |
 | **5: Doação (regras e interface)** | Motor clínico e telas de doação | `ElegibilidadeService` (idade, peso, intervalos, limite anual), `TelaDoacao` e consulta de aptos hoje. |

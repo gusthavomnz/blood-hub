@@ -5,11 +5,6 @@ using BloodHub.Servicos;
 
 namespace BloodHub.Telas;
 
-/// <summary>
-/// Ponto de entrada da aplicação — roteador de controllers.
-/// Instancia as dependências e delega cada área ao seu respectivo controller.
-/// Não contém lógica de negócio nem I/O além do banner e da opção de saída.
-/// </summary>
 public class MenuPrincipal
 {
     private readonly DoadorController _doadorController;
@@ -30,9 +25,6 @@ public class MenuPrincipal
         _relatorioController = new RelatorioController(doadorRepositorio, relatorioRepositorio, _telaDoacao);
     }
 
-    /// <summary>
-    /// Exibe o menu principal e roteia cada opção para o controller correspondente.
-    /// </summary>
     public async Task ExecutarAsync()
     {
         ExibirBanner();

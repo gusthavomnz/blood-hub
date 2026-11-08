@@ -4,15 +4,8 @@ using MySqlConnector;
 
 namespace BloodHub.Repositorios;
 
-/// <summary>
-/// Repositório para consultas analíticas e relatórios agregados (GROUP BY) utilizando ADO.NET puro com MySqlConnector.
-/// </summary>
 public sealed class RelatorioRepositorio(ConnectionFactory factory) : IRelatorioRepositorio
 {
-    /// <summary>
-    /// Agrupa as doações realizadas por tipo sanguíneo (ex: 'O+', 'A-'),
-    /// calculando o total de doações e o volume total em mL.
-    /// </summary>
     public async Task<List<ResumoPorTipoSanguineo>> TotalPorTipoSanguineoAsync()
     {
         const string sql = """
@@ -45,10 +38,6 @@ public sealed class RelatorioRepositorio(ConnectionFactory factory) : IRelatorio
         return relatorio;
     }
 
-    /// <summary>
-    /// Agrupa as doações realizadas por ano e mês,
-    /// calculando a quantidade total de coletas e o volume total em mL.
-    /// </summary>
     public async Task<List<DoacoesPorMes>> DoacoesPorMesAsync()
     {
         const string sql = """

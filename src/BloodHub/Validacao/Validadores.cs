@@ -87,7 +87,6 @@ public static class Validadores
 
     public static bool ValidarCpf(string? cpf) => TentarNormalizarCpf(cpf, out _);
 
-    // Retorna os 11 dígitos, preservando zeros à esquerda para armazenamento e busca.
     public static string FormatarCpf(string? cpf) => NormalizarCpf(cpf);
 
     public static string NormalizarCpf(string? cpf)

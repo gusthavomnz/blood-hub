@@ -2,9 +2,6 @@ using BloodHub.Modelos;
 
 namespace BloodHub.Repositorios;
 
-/// <summary>
-/// Contrato para operações de persistência e consulta da entidade Doador.
-/// </summary>
 public interface IDoadorRepositorio
 {
     Task<int> InserirAsync(Doador doador);

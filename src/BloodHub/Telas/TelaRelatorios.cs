@@ -3,15 +3,8 @@ using BloodHub.Modelos;
 
 namespace BloodHub.Telas;
 
-/// <summary>
-/// Métodos auxiliares para exibir listas e coleções de dados formatadas
-/// em colunas alinhadas no terminal (estilo tabela com cabeçalhos e separadores).
-/// </summary>
 public static class TelaRelatorios
 {
-    /// <summary>
-    /// Exibe uma lista de doadores em formato de tabela alinhada no console.
-    /// </summary>
     public static void ExibirTabelaDoadores(List<Doador> doadores)
     {
         if (doadores.Count == 0)
@@ -20,7 +13,6 @@ public static class TelaRelatorios
             return;
         }
 
-        // Definir larguras das colunas
         const int colId = 5;
         const int colNome = 30;
         const int colCpf = 15;
@@ -67,9 +59,6 @@ public static class TelaRelatorios
         Console.WriteLine($"  Total: {doadores.Count} doador(es)");
     }
 
-    /// <summary>
-    /// Exibe o relatório agregado de doações e volume coletado agrupados por tipo sanguíneo (GROUP BY).
-    /// </summary>
     public static void ExibirTabelaTipoSanguineo(List<ResumoPorTipoSanguineo> dados)
     {
         if (dados.Count == 0)
@@ -117,9 +106,6 @@ public static class TelaRelatorios
         Console.WriteLine($"  Total Geral: {totalGeralDoacoes:N0} doação(ões) | {totalGeralVolumeMl:N0} mL ({(totalGeralVolumeMl / 1000.0):F2} L)");
     }
 
-    /// <summary>
-    /// Exibe o relatório de doações agregadas por ano e mês (GROUP BY).
-    /// </summary>
     public static void ExibirTabelaDoacoesPorMes(List<DoacoesPorMes> dados)
     {
         if (dados.Count == 0)
@@ -170,9 +156,6 @@ public static class TelaRelatorios
         Console.WriteLine($"  Total Geral: {totalGeralDoacoes:N0} doação(ões) | {totalGeralVolumeMl:N0} mL ({(totalGeralVolumeMl / 1000.0):F2} L)");
     }
 
-    /// <summary>
-    /// Exibe os detalhes completos de um doador.
-    /// </summary>
     public static void ExibirDetalhesDoador(Doador d)
     {
         Console.WriteLine();
@@ -195,18 +178,12 @@ public static class TelaRelatorios
         Console.WriteLine($"  Atualizado em....: {d.AtualizadoEm:dd/MM/yyyy HH:mm}");
     }
 
-    /// <summary>
-    /// Monta a linha separadora da tabela: +------+--------+...
-    /// </summary>
     private static string MontarSeparador(params int[] larguras)
     {
         var partes = larguras.Select(l => new string('-', l + 2));
         return $"+{string.Join("+", partes)}+";
     }
 
-    /// <summary>
-    /// Monta uma linha da tabela com valores alinhados: | val1 | val2 | ...
-    /// </summary>
     private static string MontarLinha(
         int c1, int c2, int c3, int c4, int c5, int c6, int c7, int c8, int c9,
         string v1, string v2, string v3, string v4, string v5, string v6, string v7, string v8, string v9)
@@ -214,9 +191,6 @@ public static class TelaRelatorios
         return $"| {v1.PadRight(c1)} | {v2.PadRight(c2)} | {v3.PadRight(c3)} | {v4.PadRight(c4)} | {v5.PadRight(c5)} | {v6.PadRight(c6)} | {v7.PadRight(c7)} | {v8.PadRight(c8)} | {v9.PadRight(c9)} |";
     }
 
-    /// <summary>
-    /// Monta uma linha genérica da tabela com valores alinhados com base no vetor de larguras.
-    /// </summary>
     private static string MontarLinhaGenerica(int[] larguras, params string[] valores)
     {
         var partes = new string[larguras.Length];
@@ -228,9 +202,6 @@ public static class TelaRelatorios
         return $"| {string.Join(" | ", partes)} |";
     }
 
-    /// <summary>
-    /// Trunca uma string se ela exceder o tamanho máximo, adicionando "…" no final.
-    /// </summary>
     private static string Truncar(string texto, int max)
     {
         if (texto.Length <= max) return texto;

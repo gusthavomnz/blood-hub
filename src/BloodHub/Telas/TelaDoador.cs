@@ -3,10 +3,6 @@ using BloodHub.Validacao;
 
 namespace BloodHub.Telas;
 
-/// <summary>
-/// Camada de View responsável exclusivamente pela interação de console (I/O) do Doador.
-/// Não acessa banco de dados nem manipula comandos SQL diretamente.
-/// </summary>
 public class TelaDoador
 {
     public int ExibirMenu()
@@ -46,9 +42,6 @@ public class TelaDoador
         Console.WriteLine();
     }
 
-    /// <summary>
-    /// Coleta todos os dados para um novo cadastro de doador no console.
-    /// </summary>
     public Doador LerDadosDoador()
     {
         var doador = new Doador();
@@ -71,9 +64,6 @@ public class TelaDoador
         return doador;
     }
 
-    /// <summary>
-    /// Lê campos opcionais para atualizar um doador existente, preservando valores anteriores se deixados em branco.
-    /// </summary>
     public void LerDadosAtualizacao(Doador doador)
     {
         var nome = LeitorConsole.LerTextoOpcional($"Nome [{doador.Nome}]: ");
